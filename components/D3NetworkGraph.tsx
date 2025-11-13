@@ -39,11 +39,11 @@ export default function D3NetworkGraph({
       .attr('width', width)
       .attr('height', height)
 
-    let tooltip = d3.select('body').select(`.${styles.tooltip}`)
+    const bodySelection = d3.select<HTMLElement, unknown>(document.body)
+    let tooltip = bodySelection.select<HTMLDivElement>(`.${styles.tooltip}`)
     if (tooltip.empty()) {
-      tooltip = d3
-        .select('body')
-        .append('div')
+      tooltip = bodySelection
+        .append<HTMLDivElement>('div')
         .attr('class', styles.tooltip)
         .style('opacity', 0)
         .style('position', 'fixed')
@@ -323,9 +323,7 @@ export default function D3NetworkGraph({
     return () => {
       simulation.stop()
       window.removeEventListener('resize', handleResize)
-      svg.on('.zoom', null)
-      // Remove tooltip on cleanup
-      d3.select('body').select(`.${styles.tooltip}`).remove()
+      bodySelection.select(`.${styles.tooltip}`).remove()
     }
   }, [nodes, links, nodeColors, onNodeClick, connections, currentUser])
 
