@@ -47,3 +47,41 @@
   font-size: 16px;
 }
 
+.zoomControls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  background: rgba(11, 60, 97, 0.15);
+  box-shadow: 0 8px 24px rgba(7, 34, 58, 0.12);
+}
+
+.zoomButton {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(11, 60, 97, 0.85);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.zoomButton:hover {
+  background: rgba(11, 60, 97, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(11, 60, 97, 0.25);
+}
+
+.zoomButton:active {
+  transform: translateY(0);
+}
+

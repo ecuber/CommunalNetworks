@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { NetworkNode, NetworkLink } from '../lib/types'
 import styles from './D3NetworkGraph.module.css'
@@ -24,7 +24,62 @@ export default function D3NetworkGraph({
 }: D3NetworkGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity)
   const normalizeCategory = (category: string) => (category?.trim() ? category.trim() : 'Uncategorized')
+  const getZoomCenter = () =>
+    containerRef.current
+      ? [containerRef.current.clientWidth / 2, containerRef.current.clientHeight / 2] as [number, number]
+      : [0, 0] as [number, number]
+
+  const leafNodeIds = useMemo(() => {
+    const sourceIds = new Set<string>()
+    links.forEach(link => {
+      const sourceId =
+        typeof link.source === 'string'
+          ? link.source
+          : (link.source as NetworkNode).id
+      if (sourceId) {
+        sourceIds.add(sourceId)
+      }
+    })
+
+    const leaves = new Set<string>()
+    nodes.forEach(node => {
+      if (!sourceIds.has(node.id)) {
+        leaves.add(node.id)
+      }
+    })
+
+    return leaves
+  }, [nodes, links])
+
+  const handleZoomIn = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    const center = getZoomCenter()
+    d3.select(svgRef.current)
+      .transition()
+      .duration(200)
+      .call((zoomBehaviorRef.current.scaleBy as any), 1.2, center)
+  }
+
+  const handleZoomOut = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    const center = getZoomCenter()
+    d3.select(svgRef.current)
+      .transition()
+      .duration(200)
+      .call((zoomBehaviorRef.current.scaleBy as any), 1 / 1.2, center)
+  }
+
+  const handleZoomReset = () => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return
+    transformRef.current = d3.zoomIdentity
+    d3.select(svgRef.current)
+      .transition()
+      .duration(200)
+      .call((zoomBehaviorRef.current.transform as any), d3.zoomIdentity)
+  }
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || nodes.length === 0) return
@@ -61,6 +116,18 @@ export default function D3NetworkGraph({
 
     const graphGroup = svg.append('g')
       .attr('class', styles.graphGroup)
+      .attr('transform', transformRef.current.toString())
+
+    const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.3, 4])
+      .on('zoom', (event) => {
+        transformRef.current = event.transform
+        graphGroup.attr('transform', transformRef.current.toString())
+      })
+
+    zoomBehaviorRef.current = zoomBehavior
+    svg.call(zoomBehavior)
+    svg.call(zoomBehavior.transform as any, transformRef.current)
 
     const getConnectionCategories = (connection: any) =>
       connection.categories && connection.categories.length > 0
@@ -68,16 +135,32 @@ export default function D3NetworkGraph({
         : [normalizeCategory(connection.category)]
 
     const getNodeRadius = (d: any) => {
+      let radius: number
       switch (d.nodeType) {
         case 'category':
-          return 22
+          radius = 22
+          break
         case 'user':
-          return 14
+          radius = 14
+          break
         case 'root':
-          return 28
+          radius = 28
+          break
         default:
-          return Math.sqrt(Math.max(d.group, 0) + 1) * 4 + 6
+          radius = Math.sqrt(Math.max(d.group, 0) + 1) * 4 + 6
+          break
       }
+
+      if (
+        leafNodeIds.has(d.id) &&
+        d.nodeType !== 'root' &&
+        d.nodeType !== 'category' &&
+        d.nodeType !== 'user'
+      ) {
+        return radius * 1.5
+      }
+
+      return radius
     }
 
     const getNodeColor = (d: any) => {
@@ -112,12 +195,12 @@ export default function D3NetworkGraph({
         const targetType = targetNode?.nodeType
 
         if (sourceType === 'root' || targetType === 'root') {
-          return baseDistance * 0.3
+          return baseDistance * 0.1
         }
 
         if ((sourceType === 'category' && targetType === 'user') ||
             (sourceType === 'user' && targetType === 'category')) {
-          return baseDistance * 0.7
+          return baseDistance * 0.5
         }
 
         return baseDistance
@@ -323,6 +406,7 @@ export default function D3NetworkGraph({
     return () => {
       simulation.stop()
       window.removeEventListener('resize', handleResize)
+      svg.on('.zoom', null)
       bodySelection.select(`.${styles.tooltip}`).remove()
     }
   }, [nodes, links, nodeColors, onNodeClick, connections, currentUser])
@@ -330,6 +414,17 @@ export default function D3NetworkGraph({
   return (
     <div ref={containerRef} className={styles.container}>
       <svg ref={svgRef} className={styles.svg} />
+      <div className={styles.zoomControls} aria-label="Zoom controls">
+        <button type="button" onClick={handleZoomIn} className={styles.zoomButton} aria-label="Zoom in">
+          +
+        </button>
+        <button type="button" onClick={handleZoomOut} className={styles.zoomButton} aria-label="Zoom out">
+          -
+        </button>
+        <button type="button" onClick={handleZoomReset} className={styles.zoomButton} aria-label="Reset zoom">
+          Reset
+        </button>
+      </div>
     </div>
   )
 }
